@@ -81,6 +81,15 @@ html, body {
 .message__bubble li + li { margin-top: 4px; }
 .message__bubble code { background: var(--accent-soft); padding: 1px 4px; border-radius: 4px; font-size: 0.88em; }
 
+/* Pipeline evidence panel */
+.pipeline { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 8px; font-size: 0.84rem; }
+.pipeline summary { cursor: pointer; color: var(--muted); }
+.pipeline summary strong { color: var(--ink); }
+.pipeline__body { margin-top: 8px; }
+.pipeline__body > * + * { margin-top: 6px; }
+.pipeline__body ul { padding-left: 18px; }
+.pipeline__meta { display: block; color: var(--muted); font-size: 0.78rem; }
+
 /* Example chips */
 .examples-label { font-size: 0.8rem; color: var(--muted); }
 .examples { display: flex; flex-wrap: wrap; gap: 8px; }

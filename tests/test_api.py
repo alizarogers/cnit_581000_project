@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 import backend.main as main_module
 from backend.llm_adapter import LLMAdapter
 from backend.prompts import SYSTEM_PROMPT
+from backend.punbot import PunBot
 
 
 @pytest.fixture
@@ -17,10 +18,10 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr("backend.config.config.LOG_DB_PATH", str(tmp_path / "log.db"))
     mock_llm = MagicMock()
     mock_llm.generate.return_value = "**Pivot**: interest (homographic)"
-    main_module.llm = mock_llm
+    main_module.bot = PunBot(mock_llm, None)  # Claude only; pipeline tests live in test_pipeline.py
     with patch("backend.main.log_query") as mock_log:
         yield TestClient(main_module.app), mock_llm, mock_log
-    main_module.llm = None
+    main_module.bot = None
 
 
 def payload(**overrides):
@@ -40,7 +41,22 @@ def test_chat_returns_answer(client):
     c, _, _ = client
     r = c.post("/chat", json=payload())
     assert r.status_code == 200
-    assert "interest" in r.json()["answer"]
+    data = r.json()
+    assert "interest" in data["answer"]
+    assert data["mode"] == "llm_only" and data["pipeline"] is None
+    assert data["sent_message"] == payload()["message"]
+
+
+def test_chat_includes_pipeline_when_enabled(client):
+    c, mock_llm, _ = client
+    fake_pipeline = MagicMock()
+    fake_pipeline.analyze.return_value.to_dict.return_value = {"call": "Pun", "best": {"text": "interest"}}
+    with patch("backend.pipeline.format_evidence", return_value="Pipeline evidence: test"):
+        main_module.bot = PunBot(mock_llm, fake_pipeline)
+        data = c.post("/chat", json=payload()).json()
+    assert data["mode"] == "full" and data["pipeline"]["call"] == "Pun"
+    assert "Pipeline evidence: test" in mock_llm.generate.call_args.kwargs["user_message"]
+    assert "Pipeline evidence: test" in data["sent_message"]
 
 
 def test_chat_uses_pun_system_prompt(client):
@@ -79,7 +95,7 @@ def test_bad_role_is_422(client):
 
 def test_no_api_key_returns_503(client):
     c, _, _ = client
-    main_module.llm = None
+    main_module.bot = None
     assert c.post("/chat", json=payload()).status_code == 503
 
 

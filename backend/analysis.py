@@ -37,3 +37,15 @@ def parse_pivot(text: str) -> Optional[str]:
             return rest
         return None
     return None
+
+
+_AGREE_RE = re.compile(r"stage\s*1\s*[-\u2013]?\s*2\s*check\W*?[:\-]\s*\**\s*(partly agree|partially agree|disagree|agree)", re.IGNORECASE)
+
+
+def parse_stage_check(text: str) -> Optional[str]:
+    """Return "Agree", "Partly agree", "Disagree", or None."""
+    match = _AGREE_RE.search(text or "")
+    if not match:
+        return None
+    value = match.group(1).lower()
+    return "Partly agree" if value.startswith("part") else value.capitalize()
