@@ -4,7 +4,7 @@ A pun-analysis chatbot for the CNIT 58100 group project (Group 8). A sentence go
 
 | Stage | What it does | Tools |
 |---|---|---|
-| **1. Sense activation** | For each candidate word, compare its BERT vector *in this sentence* with each of its WordNet senses, and find which other word in the sentence triggers each sense. A pun needs two clearly different senses, each triggered by a **different** context word. | BERT (`bert-base-uncased`), WordNet |
+| **1. Sense activation** | For each candidate word, compare its BERT vector *in this sentence* with each of its WordNet sense definitions, find the two most active senses from different WordNet categories, and the context word that triggers each. | BERT (`bert-base-uncased`), WordNet |
 | **2. Structural check** | Keep only senses with the word's part of speech (POS integrity) and report the word's grammatical role and how each trigger word connects to it in the dependency parse. | spaCy (`en_core_web_sm`) |
 | **3. Coherence and dialog** | Claude receives the sentence plus the Stage 1-2 evidence, checks whether the two senses make a coherent joke, overrules the pipeline when it is wrong (e.g. sound-alike puns), makes the final Pun / Non-pun call, and answers follow-up questions. | Claude Sonnet 5.5 |
 
@@ -38,12 +38,14 @@ Browser ──POST /chat──▶ FastAPI (backend/main.py) ──▶ PunBot (ba
 
 For each content word (nouns, verbs, adjectives, adverbs; very general verbs like *be*, *go*, *get* are skipped; particle verbs like *branched out* also get the multiword's senses):
 
-- **Activation** of a sense = cosine between the word's BERT vector in the sentence and the headword's vector inside its WordNet gloss ("interest: a fixed charge for borrowing money...").
-- **Support** of a sense = the highest cosine between any other content word in the sentence and the gloss as a whole. That word is the sense's **trigger**.
-- **Sense A** = the sense with the best average of activation and support. **Sense B** = the best sense that is clearly different from A (different WordNet category, or path similarity below 0.2) and has a *different* trigger word.
-- **Double-sense score** = the lower of the two senses' scores. The Stage 1-2 call is **Pun** when the best word's double-sense score reaches `PUN_THRESHOLD`.
+- **Activation** of a sense = cosine between the word's BERT vector *in this sentence* and BERT's vector for that sense's WordNet definition ("interest: a fixed charge for borrowing money..."). It measures how strongly the sentence calls up that sense.
+- **Sense A** = the most activated sense. **Sense B** = the most activated sense from a **different WordNet category** (noun.possession vs noun.cognition, say), so near-duplicate senses like banker.n.01 / banker.n.02 never count as a second meaning.
+- **Trigger word** = the other word in the sentence closest to each sense's definition (with B preferring a different word than A). spaCy then reports how it connects to the pivot in the parse. Triggers explain the senses; they are not part of the score.
+- **Double-sense score** = Sense B's activation: how strongly an unrelated second meaning is still present. The Stage 1-2 call is **Pun** when the best word's score reaches `PUN_THRESHOLD` (0.30, set before evaluation and not tuned).
 
-Vectors are the mean of BERT's last four layers. **Anisotropy correction:** raw BERT cosines are high for almost any pair of words (all vectors share a common direction), so a fixed cutoff like 0.70 can't separate senses. Scores subtract a background mean vector (from 30 everyday sentences in `backend/pipeline/encoder.py`) before the cosine. Both raw and corrected values are reported.
+Vectors are the mean of BERT's last four layers. **Anisotropy correction:** raw BERT cosines are high for almost any pair (the vectors share a common direction; raw values here sit around 0.45 to 0.55), so a fixed cutoff like Milestone 4's 0.70 can't separate senses. Scores subtract a background mean vector (from 30 everyday sentences in `backend/pipeline/encoder.py`) before the cosine. Both raw and corrected values are reported.
+
+**What Stages 1-2 are good and bad at (measured on our 30-sentence test set):** they *explain* well and *decide* poorly. For 8 of the 12 homographic puns, Stage 1 ranks the correct pivot first and names a sensible pair of senses (interest: "financial involvement" triggered by *banker* vs "curiosity" triggered by *lost*; problems: "a question to be answered" triggered by *book* vs "trouble" triggered by *sad*). But as a pun detector it is at chance: accuracy 0.53, precision 0.55, recall 0.40, and the double-sense score separates puns from non-puns no better than a coin flip (AUC 0.49). The de-punned twin sentences keep most of the pun's words, and ordinary sentences also contain words with two active senses, so "an ambiguous word is present" is not the same as "this is a joke". That gap is what Stage 3 (Claude's coherence check) is for.
 
 Known limits by design: WordNet only knows words as spelled, so **heterographic puns** (coop / coupe, sole / soul, two / too) can't be found in Stages 1-2. Claude can still catch them in Stage 3, which makes them good examples of what each stage contributes.
 
@@ -111,7 +113,7 @@ The original workbook is never changed. A filled copy is saved to `evaluation/re
 
 A `.json` file with every raw output is saved alongside. Sentences are sent exactly as written, with no labels or hints.
 
-**About the threshold:** `PUN_THRESHOLD` (default 0.30) was chosen by looking at Stage 1-2 scores on this same test set, so the Stages 1-2 numbers are optimistic. Say so in the write-up, or set the threshold before looking at a new test set.
+**About the threshold:** `PUN_THRESHOLD` stays at 0.30, set before the test run. We tried several scoring variants on this test set while building Stage 1 and all were near chance for detection, so we kept the simplest one rather than tune to 30 sentences.
 
 ### Chat logs
 
@@ -130,7 +132,7 @@ sqlite3 -header -csv logs/chat_log.db "select * from chat_log" > chat_log.csv
 | `PIPELINE_MODE` | `full` | `full` = Stages 1-3; `llm_only` = Claude alone. |
 | `BERT_MODEL` | `bert-base-uncased` | Any Hugging Face BERT-style model name, or a local folder. |
 | `SPACY_MODEL` | `en_core_web_sm` | spaCy pipeline used for Stage 2. |
-| `PUN_THRESHOLD` | `0.30` | Double-sense score needed for a Stage 1-2 Pun call. |
+| `PUN_THRESHOLD` | `0.30` | Sense B activation needed for a Stage 1-2 Pun call. |
 | `MAX_SENSES` | `8` | Most frequent WordNet senses scored per word. |
 | `MAX_TOKENS` | `1024` | Max length of each answer. |
 | `MAX_HISTORY_TURNS` | `10` | Prior question/answer pairs sent for context. |

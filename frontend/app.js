@@ -66,7 +66,7 @@ function renderPipeline(p) {
     <li><strong>${label}</strong> <code>${escapeHtml(s.synset)}</code> ${escapeHtml(s.definition)}
       <span class="pipeline__meta">${s.trigger ? `triggered by <em>${escapeHtml(s.trigger)}</em> (${escapeHtml(s.trigger_relation || '')})` : 'no separate trigger word'}
       · activation ${fmt(s.activation)} (raw ${fmt(s.activation_raw)}) · support ${fmt(s.support)}</span></li>` : '';
-  const others = p.candidates.filter((c) => c.sense_a && (!best || c.text !== best.text)).slice(0, 3)
+  const others = p.candidates.filter((c) => c.sense_b && (!best || c.text !== best.text)).slice(0, 3)
     .map((c) => `${escapeHtml(c.text)} ${fmt(c.double_score)}`).join(', ');
   details.innerHTML = `
     <summary>Stages 1-2 (spaCy + BERT + WordNet): <strong>${escapeHtml(p.call)}</strong>${best ? `, pivot <em>${escapeHtml(best.text)}</em>` : ''}</summary>

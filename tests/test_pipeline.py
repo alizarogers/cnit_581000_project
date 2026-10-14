@@ -50,11 +50,18 @@ def test_particle_verb_adds_multiword_senses(pipeline):
     assert "diversify.v.03" in {s.name() for s in synsets}   # branch_out sense joins the branch senses
 
 
-def test_two_senses_need_different_triggers(pipeline):
-    result = pipeline.analyze("I went to the bank.")
-    bank = next(c for c in result.candidates if c.text == "bank")
-    assert bank.double_score == 0.0                       # only one context word ("went")
-    assert result.call == "Non-pun"
+def test_second_sense_comes_from_a_different_category(pipeline):
+    result = pipeline.analyze("I used to be a banker, but I lost interest.")
+    for c in result.candidates:
+        if c.sense_b:
+            assert c.sense_a.category != c.sense_b.category   # near-duplicate senses never count
+            assert c.double_score == c.sense_b.activation
+
+
+def test_same_category_senses_give_no_second_meaning(pipeline):
+    result = pipeline.analyze("The banker smiled.")
+    banker = next(c for c in result.candidates if c.text == "banker")
+    assert banker.sense_b is None and "same WordNet category" in banker.note   # both senses are noun.person
 
 
 def test_analyze_returns_serializable_result(pipeline):
@@ -64,7 +71,7 @@ def test_analyze_returns_serializable_result(pipeline):
     data = result.to_dict()
     json.dumps(data)
     best = data["best"]
-    assert best and best["sense_a"]["trigger"] != best["sense_b"]["trigger"]
+    assert best and best["sense_a"]["category"] != best["sense_b"]["category"]
     text = format_evidence(result)
     assert text.startswith("Pipeline evidence") and "Sense A" in text and "Sense B" in text
 

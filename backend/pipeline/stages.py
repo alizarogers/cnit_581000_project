@@ -7,15 +7,17 @@ For each candidate pivot word in a sentence:
   Stage 2a  spaCy gives the word's part of speech, lemma and dependency role.
             Only WordNet senses with the same part of speech are kept
             ("POS integrity"); the rest are counted as filtered out.
-  Stage 1   For each kept sense, BERT embeds its WordNet gloss. Two scores:
-              activation  how close the word's vector *in this sentence* is to
-                          the sense's headword vector (word-level match)
-              support     how close the best *other* word in the sentence is to
-                          the gloss as a whole (which context word triggers it)
-            Sense A is the best-scoring sense. Sense B is the best sense that is
-            clearly different from A (different WordNet category, low path
-            similarity) and is triggered by a *different* context word.
-            double-sense score = min(score A, score B)
+  Stage 1   BERT embeds the word in the sentence and each kept sense's WordNet
+            definition ("interest: a fixed charge for borrowing money...").
+              activation  centered cosine between the word in context and the
+                          definition: how strongly the sentence calls up that sense
+              trigger     the other word in the sentence closest to the
+                          definition (reported to explain the sense, not scored)
+            Sense A is the most activated sense. Sense B is the most activated
+            sense from a *different* WordNet category (noun.possession vs
+            noun.cognition, say), so near-duplicate senses never count as a
+            second meaning. double-sense score = Sense B's activation: how
+            strongly an unrelated second meaning is still present.
   Stage 2b  spaCy reports how each trigger word relates to the pivot in the
             dependency parse.
 
@@ -56,7 +58,7 @@ class SenseScore:
 
     @property
     def score(self) -> float:
-        return (self.activation + self.support) / 2
+        return self.activation
 
 
 @dataclass
@@ -93,7 +95,7 @@ class PipelineResult:
             if c:
                 for k in ("sense_a", "sense_b"):
                     if c[k]:
-                        c[k]["score"] = round((c[k]["activation"] + c[k]["support"]) / 2, 3)
+                        c[k]["score"] = c[k]["activation"]
         return d
 
 
@@ -188,7 +190,7 @@ class PunPipeline:
         headword = cand.lemma.replace("_", " ")
         vectors = self._gloss_vectors(synsets, headword)
 
-        def support(gloss_mean, exclude: Optional[str] = None):
+        def best_trigger(gloss_mean, exclude: Optional[str] = None):
             best = (0.0, 0.0, None)
             for tok, vec in context:
                 if exclude and tok.text == exclude:
@@ -199,37 +201,34 @@ class PunPipeline:
             return best
 
         scored = []
-        for s, (gmean, ghead) in zip(synsets, vectors):
-            sup, sup_raw, trig = support(gmean)
+        for s, (gmean, _ghead) in zip(synsets, vectors):
+            sup, sup_raw, trig = best_trigger(gmean)
             scored.append((s, gmean, SenseScore(
                 synset=s.name(), definition=s.definition(), category=s.lexname(),
-                activation=round(enc.centered_cosine(target_vec, ghead), 3),
-                activation_raw=round(cosine(target_vec, ghead), 3),
+                activation=round(enc.centered_cosine(target_vec, gmean), 3),
+                activation_raw=round(cosine(target_vec, gmean), 3),
                 support=round(sup, 3), support_raw=round(sup_raw, 3),
                 trigger=trig.text if trig is not None else None,
                 trigger_relation=self.relation(trig, cand) if trig is not None else None,
             )))
-        scored.sort(key=lambda x: x[2].score, reverse=True)
+        scored.sort(key=lambda x: x[2].activation, reverse=True)
         s_a, _, a = scored[0]
         cand.sense_a = a
 
-        best_b = None
-        for s, gmean, b in scored[1:]:
-            if s.lexname() == s_a.lexname() and (s_a.path_similarity(s) or 0) >= 0.2:
-                continue  # too close to sense A to count as a second meaning
-            if b.trigger == a.trigger:  # needs its own trigger word
-                sup, sup_raw, trig = support(gmean, exclude=a.trigger)
-                b.support, b.support_raw = round(sup, 3), round(sup_raw, 3)
-                b.trigger = trig.text if trig is not None else None
-                b.trigger_relation = self.relation(trig, cand) if trig is not None else None
-            if best_b is None or b.score > best_b.score:
-                best_b = b
-        cand.sense_b = best_b
-        if best_b is None:
-            cand.note = cand.note or "no second sense distinct from the first"
-        elif best_b.trigger is None:
-            cand.note = "only one context word, so the two senses cannot have separate triggers"
-        cand.double_score = round(min(a.score, best_b.score), 3) if best_b and best_b.trigger else 0.0
+        # Sense B: the strongest sense from a different WordNet category (e.g. noun.possession
+        # vs noun.cognition), so near-duplicate senses don't count as a second meaning.
+        b_entry = next(((s, g, b) for s, g, b in scored[1:] if s.lexname() != s_a.lexname()), None)
+        if b_entry is None:
+            cand.note = cand.note or "all its senses are in the same WordNet category, so no clearly different second meaning"
+            return
+        _, gmean_b, b = b_entry
+        if b.trigger == a.trigger and len(context) > 1:  # prefer a different word as its trigger
+            sup, sup_raw, trig = best_trigger(gmean_b, exclude=a.trigger)
+            b.support, b.support_raw = round(sup, 3), round(sup_raw, 3)
+            b.trigger = trig.text if trig is not None else None
+            b.trigger_relation = self.relation(trig, cand) if trig is not None else None
+        cand.sense_b = b
+        cand.double_score = round(b.activation, 3)  # how strongly the unrelated second sense is still active
 
     # -- Stage 2b: dependency relation between trigger and pivot -----------
     @staticmethod
@@ -267,7 +266,7 @@ class PunPipeline:
                 self.score_candidate(cand, synsets, tvec, context)
 
         candidates = sorted((c for c, _ in found), key=lambda c: c.double_score, reverse=True)
-        best = candidates[0] if candidates and candidates[0].double_score > 0 else None
+        best = candidates[0] if candidates and candidates[0].sense_b is not None else None
         call = "Pun" if best and best.double_score >= self.threshold else "Non-pun"
         return PipelineResult(
             sentence=sentence, call=call, threshold=self.threshold, best=best, candidates=candidates,
