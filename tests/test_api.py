@@ -131,3 +131,23 @@ class TestLLMAdapter:
         kwargs = fake_client.messages.create.call_args.kwargs
         assert kwargs["system"] == "sys"
         assert kwargs["messages"][-1] == {"role": "user", "content": "pun"}
+
+
+def test_generate_retries_without_temperature_if_rejected():
+    import anthropic
+    import httpx
+
+    fake_client = MagicMock()
+    block = MagicMock(type="text", text="ok")
+    request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+    err = anthropic.BadRequestError(
+        "temperature is not supported for this model",
+        response=httpx.Response(400, request=request),
+        body=None,
+    )
+    fake_client.messages.create.side_effect = [err, MagicMock(content=[block])]
+    adapter = LLMAdapter(client=fake_client)
+
+    assert adapter.generate("sys", [], "pun", temperature=0.0) == "ok"
+    second_call = fake_client.messages.create.call_args_list[1].kwargs
+    assert "temperature" not in second_call

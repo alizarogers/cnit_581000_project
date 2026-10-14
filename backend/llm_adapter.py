@@ -18,6 +18,7 @@ class LLMAdapter:
             config.validate()
             client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
         self._client = client
+        self._temperature_supported = True
 
     @staticmethod
     def build_messages(history: List[Dict[str, str]], user_message: str) -> List[Dict[str, str]]:
@@ -33,11 +34,28 @@ class LLMAdapter:
             recent.pop(0)
         return [*recent, {"role": "user", "content": user_message}]
 
-    def generate(self, system_prompt: str, history: List[Dict[str, str]], user_message: str) -> str:
-        response = self._client.messages.create(
+    def generate(
+        self,
+        system_prompt: str,
+        history: List[Dict[str, str]],
+        user_message: str,
+        temperature: Optional[float] = None,
+    ) -> str:
+        kwargs = dict(
             model=config.CLAUDE_MODEL,
             max_tokens=config.MAX_TOKENS,
             system=system_prompt,
             messages=self.build_messages(history, user_message),
         )
+        if temperature is not None and self._temperature_supported:
+            kwargs["temperature"] = temperature
+        try:
+            response = self._client.messages.create(**kwargs)
+        except anthropic.BadRequestError as e:
+            # Some models reject sampling parameters; retry once without it.
+            if "temperature" not in kwargs or "temperature" not in str(e).lower():
+                raise
+            self._temperature_supported = False
+            kwargs.pop("temperature")
+            response = self._client.messages.create(**kwargs)
         return "".join(block.text for block in response.content if block.type == "text")
