@@ -33,6 +33,8 @@ def test_parse_classification(text, expected):
     ("- **Pivot:** hole in one (phrase-level)", "hole in one"),
     ("**Pivot**: None. No double meaning.", None),
     ("there is no pivot here", None),
+    ('**Pivot**: There is no real pivot. The most ambiguous word is "chicken".', None),
+    ("**Pivot**: No real pivot; closest is cast.", None),
 ])
 def test_parse_pivot(text, expected):
     assert parse_pivot(text) == expected

@@ -31,6 +31,8 @@ def parse_pivot(text: str) -> Optional[str]:
         if not rest.strip() and i + 1 < len(lines):
             rest = lines[i + 1]
         rest = re.sub(r"[*_`#]", "", rest).strip()
+        if re.match(r"(there is no|there's no|no real|no pivot|none\b|n/a)", rest, re.IGNORECASE):
+            return None
         rest = re.split(r"\s[(\u2013\-]|[(,;]|\.\s|\bis\b", rest, maxsplit=1)[0]
         rest = rest.strip(" .:\"'\u201c\u201d\u2018\u2019")
         if rest and rest.lower() not in ("none", "n/a", "no pivot"):
