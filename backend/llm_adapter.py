@@ -51,8 +51,9 @@ class LLMAdapter:
             kwargs["temperature"] = temperature
         try:
             response = self._client.messages.create(**kwargs)
-        except anthropic.BadRequestError as e:
-            # Some models reject sampling parameters; retry once without it.
+        except (TypeError, anthropic.BadRequestError) as e:
+            # Newer SDK versions and models may not accept temperature
+            # (TypeError from the SDK, 400 from the API); retry once without it.
             if "temperature" not in kwargs or "temperature" not in str(e).lower():
                 raise
             self._temperature_supported = False

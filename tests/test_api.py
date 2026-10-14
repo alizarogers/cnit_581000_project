@@ -151,3 +151,16 @@ def test_generate_retries_without_temperature_if_rejected():
     assert adapter.generate("sys", [], "pun", temperature=0.0) == "ok"
     second_call = fake_client.messages.create.call_args_list[1].kwargs
     assert "temperature" not in second_call
+
+
+def test_generate_retries_without_temperature_if_sdk_rejects_it():
+    fake_client = MagicMock()
+    block = MagicMock(type="text", text="ok")
+    fake_client.messages.create.side_effect = [
+        TypeError("Messages.create() got an unexpected keyword argument 'temperature'"),
+        MagicMock(content=[block]),
+    ]
+    adapter = LLMAdapter(client=fake_client)
+
+    assert adapter.generate("sys", [], "pun", temperature=0.0) == "ok"
+    assert "temperature" not in fake_client.messages.create.call_args_list[1].kwargs

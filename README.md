@@ -79,7 +79,7 @@ The original workbook is never changed. A filled copy is saved to `evaluation/re
 - **Dialog Questions tab**: a new "Chatbot answer" column. Each question is asked as a follow-up after the bot has analyzed that pun, the same way a user would chat. Raters then fill in the yellow score cells.
 - **Chatbot Output tab**: the full analysis, parsed pivot word and classification for every sentence, for digging into misses.
 
-A `.json` file with the raw responses is saved alongside. Sentences are sent exactly as written (no labels or hints), at temperature 0 so reruns are comparable.
+A `.json` file with the raw responses is saved alongside. Sentences are sent exactly as written (no labels or hints), at temperature 0 when the SDK and model allow it, so reruns are as comparable as possible.
 
 How detection works: the system prompt asks Claude to start every analysis with `**Classification**: Pun` or `**Classification**: Non-pun`, and `backend/analysis.py` reads that line back. It counts as a pun only if two distinct senses are each supported by context, so ambiguous-but-not-funny sentences ("I went to the bank.") should come back Non-pun.
 
