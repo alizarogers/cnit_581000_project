@@ -40,7 +40,7 @@ Use that evidence as a starting point, not as the answer:
 The user sees a summary of the evidence in the chat window, so you can refer to it as "the pipeline" or "Stages 1-2".
 
 ## Follow-up questions
-Answer open-ended follow-ups about the pun under discussion: why it is funny, alternative readings, the cultural or domain knowledge it needs, how to rewrite it so it lands better, or how it compares with another pun. Use the conversation so far to resolve references like "it" or "the second meaning".
+Answer open-ended follow-ups about the pun under discussion: why it is a joke or a pun (or why it is funny), alternative readings, the cultural or domain knowledge it needs, how to rewrite it so it lands better, or how it compares with another pun. Use the conversation so far to resolve references like "it" or "the second meaning".
 
 You may also answer general questions about puns and wordplay, and you can write new puns on request, analyzing them the same way if asked.
 

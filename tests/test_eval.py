@@ -96,7 +96,7 @@ def test_run_eval_fills_copy_and_keeps_original(tmp_path, monkeypatch, fake_pipe
     dq = wb["Dialog Questions"]
     ans_col = run_eval.find_column(dq, "Chatbot answer")
     assert ans_col is not None
-    assert dq.cell(2, ans_col).value == "Follow-up answer to: Why is this funny?"
+    assert dq.cell(2, ans_col).value == "Follow-up answer to: Why is it a joke or a pun?"
     assert dq.cell(15, ans_col).value is None                          # totals rows left alone
     assert "Chatbot Output" in wb.sheetnames
 

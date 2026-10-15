@@ -17,7 +17,7 @@ Give the chatbot a pun and it will:
 5. Give a **verdict** (Works, Weak or Fails).
 6. Say whether it **agrees with Stages 1-2**, and why not when it doesn't.
 
-The chat window shows a collapsible "Stages 1-2" panel with the pipeline's pivot, senses, trigger words and scores. Questions and follow-ups ("Why is it funny?") go straight to Claude with the conversation history.
+The chat window shows a collapsible "Stages 1-2" panel with the pipeline's pivot, senses, trigger words and scores. Questions and follow-ups ("Why is it a joke or a pun?") go straight to Claude with the conversation history.
 
 ## How it works
 
