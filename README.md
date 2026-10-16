@@ -45,7 +45,7 @@ For each content word (nouns, verbs, adjectives, adverbs; very general verbs lik
 
 Vectors are the mean of BERT's last four layers. **Anisotropy correction:** raw BERT cosines are high for almost any pair (the vectors share a common direction; raw values here sit around 0.45 to 0.55), so a fixed cutoff like Milestone 4's 0.70 can't separate senses. Scores subtract a background mean vector (from 30 everyday sentences in `backend/pipeline/encoder.py`) before the cosine. Both raw and corrected values are reported.
 
-**What Stages 1-2 are good and bad at (measured on our 30-sentence test set):** they *explain* well and *decide* poorly. For 8 of the 12 homographic puns, Stage 1 ranks the correct pivot first and names a sensible pair of senses (interest: "financial involvement" triggered by *banker* vs "curiosity" triggered by *lost*; problems: "a question to be answered" triggered by *book* vs "trouble" triggered by *sad*). But as a pun detector it is at chance: accuracy 0.53, precision 0.55, recall 0.40, and the double-sense score separates puns from non-puns no better than a coin flip (AUC 0.49). The de-punned twin sentences keep most of the pun's words, and ordinary sentences also contain words with two active senses, so "an ambiguous word is present" is not the same as "this is a joke". That gap is what Stage 3 (Claude's coherence check) is for.
+**What Stages 1-2 are good and bad at (measured on the original 30-sentence test set, October 14):** they *explain* well and *decide* poorly. For 8 of the 12 homographic puns, Stage 1 ranks the correct pivot first and names a sensible pair of senses (interest: "financial involvement" triggered by *banker* vs "curiosity" triggered by *lost*; problems: "a question to be answered" triggered by *book* vs "trouble" triggered by *sad*). But as a pun detector it is at chance: accuracy 0.53, precision 0.55, recall 0.40, and the double-sense score separates puns from non-puns no better than a coin flip (AUC 0.49). The de-punned twin sentences keep most of the pun's words, and ordinary sentences also contain words with two active senses, so "an ambiguous word is present" is not the same as "this is a joke". That gap is what Stage 3 (Claude's coherence check) is for.
 
 Known limits by design: WordNet only knows words as spelled, so **heterographic puns** (coop / coupe, sole / soul, two / too) can't be found in Stages 1-2. Claude can still catch them in Stage 3, which makes them good examples of what each stage contributes.
 
@@ -95,7 +95,7 @@ pytest
 
 ## Evaluation
 
-The test set is `evaluation/Group8_Pun_Test_Set.xlsx` (15 puns, 15 non-puns, 12 dialog questions).
+The test set is `evaluation/Group8_Pun_Test_Set.xlsx` (16 puns, 16 non-puns, 12 dialog questions). P16 / N16 ("I don't enjoy computer puns one bit" and its twin) were added after the first run: Stages 1-2 call P16 a pun for the wrong reason (they pick "computer", not "bit") and also flag its twin, a useful example of right answer, wrong reason.
 
 ```bash
 python -m evaluation.run_eval --pipeline-only               # Stages 1-2 only: free, no API calls

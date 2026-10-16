@@ -236,7 +236,10 @@ def write_comparison(wb, results: Dict[str, Dict], threshold: float) -> None:
     ws.append([f"Stage 1-2 threshold: {threshold:.2f} (double-sense score needed for a Pun call)"])
     if agree:
         ws.append([f"Claude's check of Stages 1-2: " + ", ".join(f"{a} {agree.count(a)}" for a in ("Agree", "Partly agree", "Disagree"))])
-    ws.append(["Counts are small (15 puns, 15 non-puns): one error moves a rate by about 7 points."])
+    n_pun = sum(1 for r in results.values() if r.get("label") == "Pun")
+    n_non = sum(1 for r in results.values() if r.get("label") == "Non-pun")
+    if n_pun:
+        ws.append([f"Counts are small ({n_pun} puns, {n_non} non-puns): one error moves recall by about {100 / n_pun:.0f} points."])
     style_sheet(ws, [26, 32, 32, 22], freeze="B2")
 
 
